@@ -12,7 +12,7 @@ import (
 	"sync"
 
 	"github.com/spf13/cobra"
-	// "github.com/spf13/viper"
+	"github.com/spf13/viper"
 )
 
 type empty = struct{}
@@ -39,9 +39,10 @@ query($endCursor: String) {
 }
 
 func init() {
-	// viper.SetConfigFile()
-	_, b, _, _ := runtime.Caller(0)
-	fmt.Println(b)
+	viper.SetConfigFile("../gh-edu/config.json")
+	if err := viper.ReadInConfig(); err != nil {
+		log.Fatalf("Error with configuration file: " + err.Error())
+	}
 }
 
 type repoObj struct {
@@ -51,19 +52,23 @@ type repoObj struct {
 }
 
 var (
-	defaultOrg = "gh-cli-for-education"
 	rootCmd    = &cobra.Command{
 		Use:   "gh edu plagiarism",
 		Short: "Detect plagiarism in students assgiment",
 		Long:  "gh-edu-plagiarism checks all the repositories from an assgiment and compares it to detect plagiarism",
 		Run: func(cmd *cobra.Command, args []string) {
+			defaultOrg := viper.GetString("defaultOrg")
+			if defaultOrg == "" {
+				fmt.Println("Please set an organization as default")
+				return
+			}
 			regex, err := regexp.Compile("(testing)+.*")
 			if err != nil {
 				fmt.Println(err)
 				return
 			} // TODO create file to dump errors
 			reposC := make(chan repoObj)
-			go getRepos(regex, reposC)
+			go getRepos(defaultOrg, regex, reposC)
 			clonedReposC := make(chan repoObj)
 			remove := make(chan empty)
 			go clone(reposC, clonedReposC, remove)
@@ -76,7 +81,7 @@ var (
 	}
 )
 
-func getRepos(regex *regexp.Regexp, reposC chan<- repoObj) {
+func getRepos(defaultOrg string, regex *regexp.Regexp, reposC chan<- repoObj) {
 	filter := []string{"--jq", ".data.organization.repositories.edges[].node | {name, url}"}
 	allRepos := strings.Split(executeQuery(allRepos(defaultOrg), filter...), "\n")
 	for _, repo := range allRepos[:len(allRepos)-1] {
