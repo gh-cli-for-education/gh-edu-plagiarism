@@ -39,9 +39,9 @@ query($endCursor: String) {
 }
 
 func init() {
-  // viper.SetConfigFile()
-  _, b, _, _ := runtime.Caller(0)
-  fmt.Println(b)
+	// viper.SetConfigFile()
+	_, b, _, _ := runtime.Caller(0)
+	fmt.Println(b)
 }
 
 type repoObj struct {

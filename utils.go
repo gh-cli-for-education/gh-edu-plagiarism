@@ -15,10 +15,10 @@ func executeCmd(command string, silent bool, stdInFunc func(in io.WriteCloser)) 
 		shell = "sh"
 	}
 	cmd := exec.Command(shell, "-c", command)
-  if silent {
-    // cmd.Stdout = nil
-  }
-  var errBuffer bytes.Buffer
+	if !silent {
+		cmd.Stdout = os.Stdout
+	}
+	var errBuffer bytes.Buffer
 	cmd.Stderr = &errBuffer
 	if stdInFunc != nil {
 		stdin, _ := cmd.StdinPipe()
