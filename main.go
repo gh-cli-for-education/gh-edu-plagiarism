@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -52,10 +53,10 @@ type repoObj struct {
 }
 
 var (
-	rootCmd    = &cobra.Command{
+	rootCmd = &cobra.Command{
 		Use:   "gh edu plagiarism",
-		Short: "Detect plagiarism in students assgiment",
-		Long:  "gh-edu-plagiarism checks all the repositories from an assgiment and compares it to detect plagiarism",
+		Short: "Detect plagiarism in students assigment",
+		Long:  "gh-edu-plagiarism checks all the repositories from an assignment and compares it to detect plagiarism",
 		Run: func(cmd *cobra.Command, args []string) {
 			defaultOrg := viper.GetString("defaultOrg")
 			if defaultOrg == "" {
@@ -68,29 +69,45 @@ var (
 				return
 			} // TODO create file to dump errors
 			reposC := make(chan repoObj)
-			go getRepos(defaultOrg, regex, reposC)
+			reposC2 := make(chan string)
+			selectedTemplateC := make(chan string) // 1
+			go getRepos(defaultOrg, regex, reposC, reposC2)
+			go getTemplate(reposC2, selectedTemplateC)
 			clonedReposC := make(chan repoObj)
 			remove := make(chan empty)
 			go clone(reposC, clonedReposC, remove)
-			for clonedRepo := range clonedReposC {
-				fmt.Printf("%+v\n", clonedRepo)
-			}
+			send(clonedReposC, selectedTemplateC)
 			remove <- empty{}
 			<-remove
 		},
 	}
 )
 
-func getRepos(defaultOrg string, regex *regexp.Regexp, reposC chan<- repoObj) {
+func getTemplate(reposC <-chan string, selectedTemplateC chan<- string) {
+	stdInFunc := func(in io.Writer) {
+		for repo := range reposC {
+			io.WriteString(in, repo+"\n")
+		}
+	}
+	result, err := executeCmd("fzf", true, stdInFunc)
+	if err != nil {
+		fmt.Println(err)
+	}
+	selectedTemplateC <- result
+}
+
+func getRepos(defaultOrg string, regex *regexp.Regexp, reposC chan<- repoObj, reposC2 chan<- string) {
 	filter := []string{"--jq", ".data.organization.repositories.edges[].node | {name, url}"}
 	allRepos := strings.Split(executeQuery(allRepos(defaultOrg), filter...), "\n")
 	for _, repo := range allRepos[:len(allRepos)-1] {
 		var obj repoObj
 		json.Unmarshal([]byte(repo), &obj)
 		if regex.Match([]byte(obj.Name)) {
-			reposC <- obj
+			reposC2 <- obj.Name
+			reposC <- obj // TODO bottle-neck?
 		}
 	}
+	close(reposC2)
 	close(reposC)
 }
 
@@ -104,11 +121,11 @@ func clone(reposC <-chan repoObj, clonedReposC chan<- repoObj, remove chan empty
 	for repo := range reposC {
 		sem <- empty{}
 		wg.Add(1)
-		go func(repo repoObj) { // TODO add smart output -> show how files are clone in a fixed place in the terminal
+		go func(repo repoObj) {
 			defer wg.Done()
 			repoDir := filepath.Join(dir, repo.Name)
 			command := fmt.Sprintf("gh repo clone %s %s/", repo.Url, repoDir)
-			_, err := executeCmd(command, true, nil)
+			_, err := executeCmd(command, false, nil)
 			if err != nil {
 				fmt.Println("error:", err)
 			}
@@ -128,7 +145,46 @@ func clone(reposC <-chan repoObj, clonedReposC chan<- repoObj, remove chan empty
 	remove <- empty{}
 }
 
+func (r repoObj) String() string {
+	return "pepe"
+}
+
+func send(clonedReposC <-chan repoObj, selectedTemplateC <-chan string) {
+	// Set up
+	selectedTemplate := ""
+	var builder strings.Builder
+	regexUrl, _ := regexp.Compile(`https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)`)
+
+	if selectedTemplateC != nil {
+		selectedTemplate = <-selectedTemplateC
+	}
+	for clonedRepo := range clonedReposC {
+		if clonedRepo.Name != selectedTemplate {
+			builder.WriteString(fmt.Sprintf("%s/* ", clonedRepo.dir))
+		}
+	}
+	// Send request to Moss service
+	mossCmd := fmt.Sprintf("./moss -l javascript -d %s", builder.String())
+	mossResult, err := executeCmd(mossCmd, false, nil)
+	if err != nil {
+		log.Println(err)
+	}
+	mossUrl := regexUrl.Find([]byte(mossResult))
+
+	// Process the result with mossum TODO check more options in mossum
+	mossumCmd := fmt.Sprintf("mossum -p 5 -r %s", mossUrl)
+	mossumResult, err := executeCmd(mossumCmd, false, nil)
+	if err != nil {
+		log.Println(err)
+	}
+	fmt.Println("File:", mossumResult)
+}
+
 func main() {
+  err := check()
+  if err != nil {
+    log.Fatal(err)
+  }
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
 	}

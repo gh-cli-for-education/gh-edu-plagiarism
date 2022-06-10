@@ -2,3 +2,7 @@
 /gh-edu-plagiarism.exe
 
 dist/
+moss
+
+*.png
+*.txt
