@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -58,24 +57,14 @@ var (
 		Short: "Detect plagiarism in students assigment",
 		Long:  "gh-edu-plagiarism checks all the repositories from an assignment and compares it to detect plagiarism",
 		Run: func(cmd *cobra.Command, args []string) {
-			defaultOrg := viper.GetString("defaultOrg")
-			if defaultOrg == "" {
-				fmt.Println("Please set an organization as default")
-				return
-			}
-			regex, err := regexp.Compile("(testing)+.*")
-			if err != nil {
-				fmt.Println(err)
-				return
-			} // TODO create file to dump errors
-			reposC := make(chan repoObj)
-			reposC2 := make(chan string)
-			selectedTemplateC := make(chan string) // 1
-			go getRepos(defaultOrg, regex, reposC, reposC2)
-			go getTemplate(reposC2, selectedTemplateC)
+			filtered2CloneC := make(chan repoObj)   // To clone
+			filtered2TemplateC := make(chan string) // To select template
+			selectedTemplateC := make(chan string)  // 1
+			go filter(filtered2CloneC, filtered2TemplateC)
+			go getTemplate(filtered2TemplateC, selectedTemplateC)
 			clonedReposC := make(chan repoObj)
 			remove := make(chan empty)
-			go clone(reposC, clonedReposC, remove)
+			go clone(filtered2CloneC, clonedReposC, remove)
 			send(clonedReposC, selectedTemplateC)
 			remove <- empty{}
 			<-remove
@@ -94,21 +83,6 @@ func getTemplate(reposC <-chan string, selectedTemplateC chan<- string) {
 		fmt.Println(err)
 	}
 	selectedTemplateC <- result
-}
-
-func getRepos(defaultOrg string, regex *regexp.Regexp, reposC chan<- repoObj, reposC2 chan<- string) {
-	filter := []string{"--jq", ".data.organization.repositories.edges[].node | {name, url}"}
-	allRepos := strings.Split(executeQuery(allRepos(defaultOrg), filter...), "\n")
-	for _, repo := range allRepos[:len(allRepos)-1] {
-		var obj repoObj
-		json.Unmarshal([]byte(repo), &obj)
-		if regex.Match([]byte(obj.Name)) {
-			reposC2 <- obj.Name
-			reposC <- obj // TODO bottle-neck?
-		}
-	}
-	close(reposC2)
-	close(reposC)
 }
 
 func clone(reposC <-chan repoObj, clonedReposC chan<- repoObj, remove chan empty) {
@@ -145,10 +119,6 @@ func clone(reposC <-chan repoObj, clonedReposC chan<- repoObj, remove chan empty
 	remove <- empty{}
 }
 
-func (r repoObj) String() string {
-	return "pepe"
-}
-
 func send(clonedReposC <-chan repoObj, selectedTemplateC <-chan string) {
 	// Set up
 	selectedTemplate := ""
@@ -181,10 +151,13 @@ func send(clonedReposC <-chan repoObj, selectedTemplateC <-chan string) {
 }
 
 func main() {
-  err := check()
-  if err != nil {
-    log.Fatal(err)
-  }
+	errS := check()
+	if len(errS) > 0 {
+		for _, err := range errS {
+			fmt.Println(err)
+		}
+		os.Exit(1)
+	}
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
 	}

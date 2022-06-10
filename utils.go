@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/go-ping/ping"
+	"github.com/spf13/viper"
 )
 
 func executeCmd(command string, showStderr bool, stdInFunc func(in io.Writer)) (string, error) {
@@ -36,7 +37,6 @@ func executeCmd(command string, showStderr bool, stdInFunc func(in io.Writer)) (
 	if err != nil {
 		return "", errors.New(bError.String() + err.Error())
 	}
-	fmt.Println("debug:", cmd.String())
 	return strings.TrimRight(string(result), "\n"), nil
 }
 
@@ -58,39 +58,38 @@ func executeQuery(query string, options ...string) string {
 	return string(result)
 }
 
-func check() error {
-	// registry := map[string]string{
- //    "fzf", "pepe"
- //  }
-	// Check fzf is installed
-	if _, err := exec.LookPath("fzf"); err != nil {
-		return errors.New("You need to have fzf installed") // TODO delete this
+func check() []error {
+	dependencies := map[string]string{
+		"fzf":    "You need to have fzf installed\nhttps://github.com/junegunn/fzf",
+		"mossum": "You need to have mossum installed\nhttps://github.com/hjalti/mossum",
+		"perl":   "You need to have perl installed",
+		"./moss": "You need to have a moss script in the root\nhttps://theory.stanford.edu/~aiken/moss/",
 	}
-	// Check mossum is installed
-	if _, err := exec.LookPath("mossum"); err != nil {
-		return errors.New("You need to have mossum installed\nhttps://github.com/hjalti/mossum")
-	}
-	// Check moss script is present
-	if _, err := exec.LookPath("./moss"); err != nil {
-		return errors.New("You need to have a moss script in the root\nhttps://theory.stanford.edu/~aiken/moss/")
-	}
-	// Check perl is installed
-	if _, err := exec.LookPath("perl"); err != nil {
-		return errors.New("You need to have perl installed")
+  errorS := make([]error, 0, len(dependencies) + 5)
+	for d, e := range dependencies {
+		if _, err := exec.LookPath(d); err != nil {
+      errorS = append(errorS, errors.New(e))
+		}
 	}
 	// Check python version 3
 	if r, err := executeCmd(`python -c "print(__import__('sys').version_info[:1]==(3,))"`, false, nil); r != "True" {
-		return fmt.Errorf("Python version 3 is required\n" + err.Error())
+		errorS = append(errorS, errors.New("Python version 3 is required\n" + err.Error()))
 	}
 	pinger, err := ping.NewPinger("moss.stanford.edu")
 	if err != nil {
-		return err
+    log.Fatal(err)
 	}
-	pinger.Count = 3
+	pinger.Count = 2
 	log.Println("Checking server is up...")
 	err = pinger.Run() // Blocks until finished.
 	if err != nil {
-		return err
+    errorS = append(errorS, err)
 	}
-	return nil
+	if viper.GetString("defaultOrg") == "" {
+		errorS = append(errorS, errors.New("Please set an organization"))
+	}
+	if viper.GetString("assignment") == "" {
+		errorS = append(errorS, errors.New("Please set a current assignment"))
+	}
+	return errorS
 }
