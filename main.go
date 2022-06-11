@@ -38,13 +38,6 @@ query($endCursor: String) {
 `, org)
 }
 
-func init() {
-	viper.SetConfigFile("../gh-edu/config.json")
-	if err := viper.ReadInConfig(); err != nil {
-		log.Fatalf("Error with configuration file: " + err.Error())
-	}
-}
-
 type repoObj struct {
 	Name string
 	Url  string
@@ -57,22 +50,45 @@ var (
 		Short: "Detect plagiarism in students assigment",
 		Long:  "gh-edu-plagiarism checks all the repositories from an assignment and compares it to detect plagiarism",
 		Run: func(cmd *cobra.Command, args []string) {
-			filtered2CloneC := make(chan repoObj)   // To clone
-			filtered2TemplateC := make(chan string) // To select template
-			selectedTemplateC := make(chan string)  // 1
-			go filter(filtered2CloneC, filtered2TemplateC)
-			go getTemplate(filtered2TemplateC, selectedTemplateC)
-			clonedReposC := make(chan repoObj)
-			remove := make(chan empty)
-			go clone(filtered2CloneC, clonedReposC, remove)
-			send(clonedReposC, selectedTemplateC)
-			remove <- empty{}
-			<-remove
+			errS := check()
+			if len(errS) > 0 {
+				for _, err := range errS {
+					fmt.Println(err)
+				}
+				os.Exit(1)
+			}
+			sendToCloneC := make(chan repoObj)
+			selectTemplateC, selectedTemplateC := func() (chan string, chan string) {
+				if areTemplate {
+					return make(chan string), make(chan string)
+				}
+				return nil, nil
+			}()
+			go filter(sendToCloneC, selectTemplateC)
+			go getTemplate(selectTemplateC, selectedTemplateC)
+			clonedC := make(chan repoObj)
+			removeC := make(chan empty)
+			go clone(sendToCloneC, clonedC, removeC)
+			send(clonedC, selectedTemplateC)
+			removeC <- empty{}
+			<-removeC
 		},
 	}
+	areTemplate bool
 )
 
+func init() {
+	viper.SetConfigFile("../gh-edu/config.json")
+	if err := viper.ReadInConfig(); err != nil {
+		log.Fatalf("Error with configuration file: " + err.Error())
+	}
+	rootCmd.Flags().BoolVarP(&areTemplate, "template", "t", false, "Indicate if there is a tutor template")
+}
+
 func getTemplate(reposC <-chan string, selectedTemplateC chan<- string) {
+	if reposC == nil || selectedTemplateC == nil {
+		return
+	}
 	stdInFunc := func(in io.Writer) {
 		for repo := range reposC {
 			io.WriteString(in, repo+"\n")
@@ -86,7 +102,7 @@ func getTemplate(reposC <-chan string, selectedTemplateC chan<- string) {
 }
 
 func clone(reposC <-chan repoObj, clonedReposC chan<- repoObj, remove chan empty) {
-	dir, err := os.MkdirTemp("", "*-gh_edu_plagiarism")
+	dir, err := os.MkdirTemp("", "*_gh-edu-plagiarism")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -121,20 +137,21 @@ func clone(reposC <-chan repoObj, clonedReposC chan<- repoObj, remove chan empty
 
 func send(clonedReposC <-chan repoObj, selectedTemplateC <-chan string) {
 	// Set up
-	selectedTemplate := ""
 	var builder strings.Builder
 	regexUrl, _ := regexp.Compile(`https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)`)
 
-	if selectedTemplateC != nil {
-		selectedTemplate = <-selectedTemplateC
-	}
+	clonedRepo := <-clonedReposC
+	dir := string(regexp.MustCompile(".*/").Find([]byte(clonedRepo.dir)))
+	builder.WriteString(fmt.Sprintf("%s/* ", clonedRepo.dir))
 	for clonedRepo := range clonedReposC {
-		if clonedRepo.Name != selectedTemplate {
-			builder.WriteString(fmt.Sprintf("%s/* ", clonedRepo.dir))
-		}
+		builder.WriteString(fmt.Sprintf("%s/* ", clonedRepo.dir))
+	}
+	template := ""
+	if selectedTemplateC != nil {
+		template = fmt.Sprintf("-b %s%s/* ", dir, <-selectedTemplateC)
 	}
 	// Send request to Moss service
-	mossCmd := fmt.Sprintf("./moss -l javascript -d %s", builder.String())
+	mossCmd := fmt.Sprintf("./moss -l javascript -d %s %s", template, builder.String())
 	mossResult, err := executeCmd(mossCmd, false, nil)
 	if err != nil {
 		log.Println(err)
@@ -151,13 +168,6 @@ func send(clonedReposC <-chan repoObj, selectedTemplateC <-chan string) {
 }
 
 func main() {
-	errS := check()
-	if len(errS) > 0 {
-		for _, err := range errS {
-			fmt.Println(err)
-		}
-		os.Exit(1)
-	}
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
 	}
