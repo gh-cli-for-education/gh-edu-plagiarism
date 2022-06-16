@@ -39,17 +39,21 @@ query($endCursor: String) {
 }
 
 type repoObj struct {
-	Name string
-	Url  string
+	Name string `json:"name"`
+	Url  string `json:"url"`
 	dir  string
 }
 
 var (
+	_, b, _, _ = runtime.Caller(0)
+	basepath   = filepath.Dir(b)
+
 	rootCmd = &cobra.Command{
 		Use:   "gh edu plagiarism",
 		Short: "Detect plagiarism in students assigment",
 		Long:  "gh-edu-plagiarism checks all the repositories from an assignment and compares it to detect plagiarism",
 		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println("hola")
 			errS := check()
 			if len(errS) > 0 {
 				for _, err := range errS {
@@ -140,7 +144,7 @@ func send(clonedReposC <-chan repoObj, selectedTemplateC <-chan string) {
 	var builder strings.Builder
 	regexUrl, _ := regexp.Compile(`https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)`)
 
-	clonedRepo := <-clonedReposC
+	clonedRepo := <-clonedReposC // Get temp directory reading from the first cloned repo
 	dir := string(regexp.MustCompile(".*/").Find([]byte(clonedRepo.dir)))
 	builder.WriteString(fmt.Sprintf("%s/* ", clonedRepo.dir))
 	for clonedRepo := range clonedReposC {
@@ -151,7 +155,8 @@ func send(clonedReposC <-chan repoObj, selectedTemplateC <-chan string) {
 		template = fmt.Sprintf("-b %s%s/* ", dir, <-selectedTemplateC)
 	}
 	// Send request to Moss service
-	mossCmd := fmt.Sprintf("./moss -l javascript -d %s %s", template, builder.String())
+	mossCmd := fmt.Sprintf("%s/moss -l javascript -d %s %s", basepath, template, builder.String())
+	fmt.Println("Conecting with Moss server...")
 	mossResult, err := executeCmd(mossCmd, false, nil)
 	if err != nil {
 		log.Println(err)
@@ -160,6 +165,7 @@ func send(clonedReposC <-chan repoObj, selectedTemplateC <-chan string) {
 
 	// Process the result with mossum TODO check more options in mossum
 	mossumCmd := fmt.Sprintf("mossum -p 5 -r %s", mossUrl)
+	fmt.Println("Generating graph...")
 	mossumResult, err := executeCmd(mossumCmd, false, nil)
 	if err != nil {
 		log.Println(err)

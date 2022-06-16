@@ -24,5 +24,13 @@ Plagiarism depends on the Stanford service MOSS, it clones all the repositories 
 1. Get the binary on releases or clone the repo and compile it (You will need go 1.18 or more recent)
 2. Move the moss script to the same directory of the binary
 
+## Known limitations:
+Go uses google's re2 regular expression engine, which have been designed for security and predictable performance
+Sadly enough this means that lookarounds are not supported. Please keep in mind, when you are setting assignments regex
+Links:
+- https://github.com/google/re2/wiki/WhyRE2
+- https://github.com/google/re2/wiki/Syntax
+- https://github.com/golang/go/issues/18868
+
 ## TODO
 - [ ] Add more CLI options
