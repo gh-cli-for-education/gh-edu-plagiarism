@@ -53,7 +53,6 @@ var (
 		Short: "Detect plagiarism in students assigment",
 		Long:  "gh-edu-plagiarism checks all the repositories from an assignment and compares it to detect plagiarism",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("hola")
 			errS := check()
 			if len(errS) > 0 {
 				for _, err := range errS {
@@ -61,6 +60,7 @@ var (
 				}
 				os.Exit(1)
 			}
+
 			sendToCloneC := make(chan repoObj)
 			selectTemplateC, selectedTemplateC := func() (chan string, chan string) {
 				if areTemplate {
@@ -74,8 +74,8 @@ var (
 			removeC := make(chan empty)
 			go clone(sendToCloneC, clonedC, removeC)
 			send(clonedC, selectedTemplateC)
-			removeC <- empty{}
-			<-removeC
+			// removeC <- empty{}
+			// <-removeC
 		},
 	}
 	areTemplate bool
@@ -106,7 +106,7 @@ func getTemplate(reposC <-chan string, selectedTemplateC chan<- string) {
 }
 
 func clone(reposC <-chan repoObj, clonedReposC chan<- repoObj, remove chan empty) {
-	dir, err := os.MkdirTemp("", "*_gh-edu-plagiarism")
+	tmpDir, err := os.MkdirTemp("", "*_gh-edu-plagiarism")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func clone(reposC <-chan repoObj, clonedReposC chan<- repoObj, remove chan empty
 		wg.Add(1)
 		go func(repo repoObj) {
 			defer wg.Done()
-			repoDir := filepath.Join(dir, repo.Name)
+			repoDir := filepath.Join(tmpDir, repo.Name)
 			command := fmt.Sprintf("gh repo clone %s %s/", repo.Url, repoDir)
 			_, err := executeCmd(command, false, nil)
 			if err != nil {
@@ -132,7 +132,7 @@ func clone(reposC <-chan repoObj, clonedReposC chan<- repoObj, remove chan empty
 	close(clonedReposC)
 	// When the signal is received clean up all the repositories and send another signal to let know it has finished
 	<-remove
-	err = os.RemoveAll(dir)
+	err = os.RemoveAll(tmpDir)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -145,32 +145,44 @@ func send(clonedReposC <-chan repoObj, selectedTemplateC <-chan string) {
 	regexUrl, _ := regexp.Compile(`https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)`)
 
 	clonedRepo := <-clonedReposC // Get temp directory reading from the first cloned repo
-	dir := string(regexp.MustCompile(".*/").Find([]byte(clonedRepo.dir)))
+	tmpDir := string(regexp.MustCompile(".*/").Find([]byte(clonedRepo.dir)))
 	builder.WriteString(fmt.Sprintf("%s/* ", clonedRepo.dir))
 	for clonedRepo := range clonedReposC {
 		builder.WriteString(fmt.Sprintf("%s/* ", clonedRepo.dir))
 	}
 	template := ""
 	if selectedTemplateC != nil {
-		template = fmt.Sprintf("-b %s%s/* ", dir, <-selectedTemplateC)
+		template = fmt.Sprintf("-b %s%s/* ", tmpDir, <-selectedTemplateC)
 	}
 	// Send request to Moss service
 	mossCmd := fmt.Sprintf("%s/moss -l javascript -d %s %s", basepath, template, builder.String())
-	fmt.Println("Conecting with Moss server...")
+	fmt.Println("Connecting with Moss server...")
 	mossResult, err := executeCmd(mossCmd, false, nil)
 	if err != nil {
 		log.Println(err)
 	}
 	mossUrl := regexUrl.Find([]byte(mossResult))
+	process(mossUrl, tmpDir)
+}
 
-	// Process the result with mossum TODO check more options in mossum
-	mossumCmd := fmt.Sprintf("mossum -p 5 -r %s", mossUrl)
+// Process the result with mossum. TODO check more options in mossum
+func process(mossUrl []byte, tmpDir string) {
+	mossumCmd := fmt.Sprintf("mossum -p 5 -r -t \".*/(.+)/.*\" -o %s/result %s", tmpDir, mossUrl)
 	fmt.Println("Generating graph...")
-	mossumResult, err := executeCmd(mossumCmd, false, nil)
+	_, err := executeCmd(mossumCmd, false, nil)
 	if err != nil {
 		log.Println(err)
 	}
-	fmt.Println("File:", mossumResult)
+	f, err := os.Open(tmpDir + "/result.txt")
+	if err != nil {
+		log.Println(err)
+	}
+	report, err := io.ReadAll(f)
+	if err != nil {
+		log.Println(err)
+	}
+	fmt.Println("Report:\n", string(report))
+	openFile(tmpDir + "result-1.png")
 }
 
 func main() {

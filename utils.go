@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 
@@ -59,13 +60,27 @@ func executeQuery(query string, options ...string) string {
 	return string(result)
 }
 
+func openFile(file string) error {
+	var err error
+	switch runtime.GOOS {
+	case "linux":
+    err = exec.Command("xdg-open", file).Run()
+	case "windows":
+		err = exec.Command("start", file).Run()
+	case "darwin":
+		err = exec.Command("open", file).Run()
+	default:
+		fmt.Println("Open the file", file)
+	}
+	return err
+}
+
 func check() []error {
 	fmt.Println("Checking everything is ok...")
-  fmt.Println(basepath)
 	dependencies := map[string]string{
-		"fzf":    "You need to have fzf installed\nhttps://github.com/junegunn/fzf",
-		"mossum": "You need to have mossum installed\nhttps://github.com/hjalti/mossum",
-		"perl":   "You need to have perl installed",
+		"fzf":                            "You need to have fzf installed\nhttps://github.com/junegunn/fzf",
+		"mossum":                         "You need to have mossum installed\nhttps://github.com/hjalti/mossum",
+		"perl":                           "You need to have perl installed",
 		fmt.Sprintf("%s/moss", basepath): "You need to have a moss script in the root\nhttps://theory.stanford.edu/~aiken/moss/",
 	}
 	errorS := make([]error, 0, len(dependencies)+5)

@@ -26,7 +26,7 @@ Plagiarism depends on the Stanford service MOSS, it clones all the repositories 
 
 ## Known limitations:
 Go uses google's re2 regular expression engine, which have been designed for security and predictable performance
-Sadly enough this means that lookarounds are not supported. Please keep in mind, when you are setting assignments regex
+Sadly enough this means that lookarounds are not supported. Please keep in mind, when you are setting assignments regex\
 Links:
 - https://github.com/google/re2/wiki/WhyRE2
 - https://github.com/google/re2/wiki/Syntax
@@ -34,3 +34,6 @@ Links:
 
 ## TODO
 - [ ] Add more CLI options
+- [ ] Remove temporary dire. Due to xdg-open I can't delete the files when the app is about to close.\
+Option 1: Watch when the user quit xdg-open\
+Option 2: Delete all related temporary directory at start
