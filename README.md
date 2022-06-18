@@ -55,6 +55,20 @@ It looks like the original creator of MOSS lost the source code and the server
 is running on a binary. So it's very unlikely that more languages are added\
 https://www.quora.com/Why-is-the-MOSS-measure-of-the-software-similarity-algorithm-not-open-sourced
 
+## How to use it
+Extracted from the ``--help`` flag
+```
+  Usage:
+  gh edu plagiarism [-a] [-l <language>] [-t] [flags]
+
+Flags:
+  -a, --anonymize                                                                                 Indicate if you want to randomize the names
+  -h, --help                                                                                      help for gh
+  -l, --language https://github.com/gh-cli-for-education/gh-edu-plagiarism#compatible-languages   Select the language
+  -t, --template                                                                                  Indicate if there is a tutor template
+```
+
+
 ## Known limitations:
 Go uses google's re2 regular expression engine, which have been designed for security and predictable performance
 Sadly enough this means that look-arounds are not supported. Please keep in mind, when you are setting assignments regex\
@@ -62,9 +76,3 @@ Links:
 - https://github.com/google/re2/wiki/WhyRE2
 - https://github.com/google/re2/wiki/Syntax
 - https://github.com/golang/go/issues/18868
-
-## TODO
-- [ ] Add more CLI options
-- [ ] Remove temporary dire. Due to xdg-open I can't delete the files when the app is about to close.\
-Option 1: Watch when the user quit xdg-open\
-Option 2: Delete all related temporary directory at start

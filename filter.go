@@ -6,16 +6,18 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/gh-cli-for-education/gh-edu-plagiarism/pkg/utils"
 	"github.com/spf13/viper"
 )
 
 func filter(repos2CloneC chan<- repoObj, selectTemplateC chan<- string) {
 	regex, err := regexp.Compile(viper.GetString("assignment"))
 	if err != nil {
-		log.Panic(err) // TODO implement error system  // TODO create file to dump errors
+		log.Panic(err)
 	}
 	filter := []string{"--jq", ".data.organization.repositories.edges[].node | {name, url}"}
-	allRepos := strings.Split(executeQuery(allRepos(viper.GetString("defaultOrg")), filter...), "\n")
+  AllReposQ := utils.AllReposQ(viper.GetString("defaultOrg"))
+	allRepos := strings.Split(utils.ExecuteQuery(AllReposQ, filter...), "\n")
 	if selectTemplateC == nil {
 		filterReposNoTemplate(allRepos, regex, repos2CloneC)
 	} else {
