@@ -155,7 +155,7 @@ func check() []error {
 		"perl":   "You need to have perl installed",
 		mossPath: "You need to have a moss script in the root\nhttps://theory.stanford.edu/~aiken/moss/",
 	}
-  const posibleErr = 10
+	const posibleErr = 10
 	errorS := make([]error, 0, posibleErr)
 	for d, e := range dependencies {
 		if _, err := exec.LookPath(d); err != nil {

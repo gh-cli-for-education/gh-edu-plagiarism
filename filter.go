@@ -16,7 +16,7 @@ func filter(repos2CloneC chan<- repoObj, selectTemplateC chan<- string) {
 		log.Panic(err)
 	}
 	filter := []string{"--jq", ".data.organization.repositories.edges[].node | {name, url}"}
-  AllReposQ := utils.AllReposQ(viper.GetString("defaultOrg"))
+	AllReposQ := utils.AllReposQ(viper.GetString("defaultOrg"))
 	allRepos := strings.Split(utils.ExecuteQuery(AllReposQ, filter...), "\n")
 	if selectTemplateC == nil {
 		filterReposNoTemplate(allRepos, regex, repos2CloneC)

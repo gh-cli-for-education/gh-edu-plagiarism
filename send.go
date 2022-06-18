@@ -2,12 +2,12 @@ package main
 
 import (
 	"fmt"
+	"github.com/gh-cli-for-education/gh-edu-plagiarism/pkg/utils"
 	"io"
 	"log"
 	"os"
 	"regexp"
 	"strings"
-	"github.com/gh-cli-for-education/gh-edu-plagiarism/pkg/utils"
 )
 
 func send(clonedReposC <-chan repoObj, selectedTemplateC <-chan string) {
@@ -50,10 +50,10 @@ func send(clonedReposC <-chan repoObj, selectedTemplateC <-chan string) {
 
 // Process the result with mossum. TODO check more options in mossum
 func process(mossUrl []byte, tmpDir string) {
-  aF := ""
-  if anonymize {
-    aF = "-a"
-  }
+	aF := ""
+	if anonymize {
+		aF = "-a"
+	}
 	mossumCmd := fmt.Sprintf("mossum -p 5 -r -t \".*/(.+)/.*\" %s -o %s/result %s", aF, tmpDir, mossUrl) // .*/(.+).* from <randNumber>gh-edu-plagiarism/assigmentName/ get assigmentName
 	fmt.Println("Generating graph...")
 	_, err := utils.ExecuteCmd(mossumCmd, false, nil)
@@ -64,8 +64,8 @@ func process(mossUrl []byte, tmpDir string) {
 	if err != nil {
 		log.Println(err)
 	}
-  // ReadAll will return a slice as big as the file generated but mossum.
-  // renember this is n!/((n-2)!2!) pairs. If the file is too big use io.Copy
+	// ReadAll will return a slice as big as the file generated but mossum.
+	// renember this is n!/((n-2)!2!) pairs. If the file is too big use io.Copy
 	report, err := io.ReadAll(f)
 	if err != nil {
 		log.Println(err)
