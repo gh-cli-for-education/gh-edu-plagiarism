@@ -21,12 +21,43 @@ Plagiarism depends on the Stanford service MOSS, it clones all the repositories 
 2. Move the moss script to the root directory ``mv moss ~/.local/share/gh/extensions/gh-edu-plagiarism``
 
 ### Stand-alone:
-1. Get the binary on releases or clone the repo and compile it (You will need go 1.18 or more recent)
+1. Get the binary on releases or clone the repository and compile it (You will need go 1.18 or more recent)
 2. Move the moss script to the same directory of the binary
+
+## Compatible languages
+- c
+- cc (C++)
+- java
+- ml (Meta Language)
+- pascal
+- ada
+- lisp
+- scheme
+- haskell
+- fortran
+- ascii
+- vhdl
+- perl
+- matlab
+- python
+- mips
+- prolog
+- spice
+- vb (Visual Basic)
+- csharp (C#)
+- modula2
+- a8086 (8086 assembly)
+- javascript
+- plsql (PL/SQL)
+- verilog
+
+It looks like the original creator of MOSS lost the source code and the server
+is running on a binary. So it's very unlikely that more languages are added\
+https://www.quora.com/Why-is-the-MOSS-measure-of-the-software-similarity-algorithm-not-open-sourced
 
 ## Known limitations:
 Go uses google's re2 regular expression engine, which have been designed for security and predictable performance
-Sadly enough this means that lookarounds are not supported. Please keep in mind, when you are setting assignments regex\
+Sadly enough this means that look-arounds are not supported. Please keep in mind, when you are setting assignments regex\
 Links:
 - https://github.com/google/re2/wiki/WhyRE2
 - https://github.com/google/re2/wiki/Syntax
