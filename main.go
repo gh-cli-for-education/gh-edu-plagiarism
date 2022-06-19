@@ -1,15 +1,12 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
-	"sync"
 	"time"
 
 	"github.com/gh-cli-for-education/gh-edu-plagiarism/pkg/utils"
@@ -28,18 +25,20 @@ func init() {
 	rootCmd.Flags().BoolVarP(&areTemplateF, "template", "t", false, "Indicate if there is a tutor template")
 	rootCmd.Flags().VarP(&language, "language", "l", "Select the language")
 	rootCmd.Flags().BoolVarP(&anonymize, "anonymize", "a", false, "Indicate if you want to randomize the names")
+	rootCmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "No INFO in the output only the result")
 }
 
 var (
 	rootCmd = &cobra.Command{
-		Use:   "gh edu plagiarism [-a] [-l <language>] [-t]",
+		Use:   "gh edu plagiarism [-a] [-q] [-l [<language>]] [-t]",
 		Short: "Detect plagiarism in students assigment",
 		Long:  "gh-edu-plagiarism checks all the repositories from an assignment and compares it to detect plagiarism",
 		RunE:  func(cmd *cobra.Command, args []string) error { return realMain() },
 	}
 	areTemplateF bool
-	language     utils.Language
+	language     langType
 	anonymize    bool
+	quiet        bool
 )
 
 // Clean up delete all the directories left by the last execution
@@ -48,23 +47,23 @@ var (
 func cleanUp() error {
 	tempDir := os.TempDir()
 	if tempDir == "" {
-		return errors.New("internal error: couldn't access temp dir")
+		return fmt.Errorf("internal error: cleanUp: couldn't access temp dir")
 	}
 	pattern := tempDir + `/*gh-edu-plagiarism`
 	filesString, err := filepath.Glob(pattern)
 	if err != nil {
-		return err
+		return fmt.Errorf("internal error: cleanUp: %w", err)
 	}
 	for _, fString := range filesString {
 		err = os.RemoveAll(fString)
 		if err != nil {
-			return err
+			fmt.Println("internal warning: cleanUp: couldn't delete: ", fString)
 		}
 	}
 	return nil
 }
 
-func getTemplate(reposC <-chan string, selectedTemplateC chan<- string) {
+func selectTemplate(reposC <-chan string, selectedTemplateC chan<- string, errC chan<- error) {
 	if reposC == nil || selectedTemplateC == nil {
 		return
 	}
@@ -75,7 +74,8 @@ func getTemplate(reposC <-chan string, selectedTemplateC chan<- string) {
 	}
 	result, err := utils.ExecuteCmd("fzf", true, stdInFunc)
 	if err != nil {
-		fmt.Println(err)
+		errC <- fmt.Errorf("selectTemplate: %w", err)
+		return
 	}
 	selectedTemplateC <- result
 }
@@ -84,33 +84,6 @@ type repoObj struct {
 	Name string `json:"name"`
 	Url  string `json:"url"`
 	dir  string
-}
-
-func clone(reposC <-chan repoObj, clonedReposC chan<- repoObj) {
-	tmpDir, err := os.MkdirTemp("", "*_gh-edu-plagiarism")
-	if err != nil {
-		log.Fatal(err)
-	}
-	sem := make(chan empty, runtime.NumCPU())
-	var wg sync.WaitGroup
-	for repo := range reposC {
-		sem <- empty{}
-		wg.Add(1)
-		go func(repo repoObj) {
-			defer wg.Done()
-			repoDir := filepath.Join(tmpDir, repo.Name)
-			command := fmt.Sprintf("gh repo clone %s %s/", repo.Url, repoDir)
-			_, err := utils.ExecuteCmd(command, false, nil)
-			if err != nil {
-				fmt.Println("error:", err)
-			}
-			repo.dir = repoDir
-			clonedReposC <- repo
-			<-sem
-		}(repo)
-	}
-	wg.Wait()
-	close(clonedReposC)
 }
 
 func main() {
@@ -125,7 +98,7 @@ func realMain() error {
 		for _, err := range errS {
 			fmt.Println(err)
 		}
-		os.Exit(1)
+		return fmt.Errorf("solve this/these problem(s) and try again")
 	}
 	err := cleanUp()
 	if err != nil {
@@ -138,16 +111,18 @@ func realMain() error {
 		}
 		return nil, nil
 	}()
-	go filter(sendToCloneC, selectTemplateC)
-	go getTemplate(selectTemplateC, selectedTemplateC)
+	errC := make(chan error)
+
+	go filter(sendToCloneC, selectTemplateC, errC)
+	go selectTemplate(selectTemplateC, selectedTemplateC, errC)
 	clonedC := make(chan repoObj)
-	go clone(sendToCloneC, clonedC)
-	send(clonedC, selectedTemplateC)
-	return nil
+	go clone(sendToCloneC, clonedC, errC)
+	go send(clonedC, selectedTemplateC, errC) // send also close errC
+	return <-errC
 }
 
 func check() []error {
-	fmt.Println("Checking everything is ok...")
+	utils.Println(quiet, "Checking everything is ok...")
 	mossPath := fmt.Sprintf("%s/moss", utils.Basepath)
 	dependencies := map[string]string{
 		"fzf":    "You need to have fzf installed\nhttps://github.com/junegunn/fzf",
@@ -159,16 +134,16 @@ func check() []error {
 	errorS := make([]error, 0, posibleErr)
 	for d, e := range dependencies {
 		if _, err := exec.LookPath(d); err != nil {
-			errorS = append(errorS, errors.New(e))
+			errorS = append(errorS, fmt.Errorf(e))
 		}
 	}
 	// Check python version 3
 	if r, err := utils.ExecuteCmd(`python -c "print(__import__('sys').version_info[:1]==(3,))"`, false, nil); r != "True" {
-		errorS = append(errorS, errors.New("Python version 3 is required\n"+err.Error()))
+		errorS = append(errorS, fmt.Errorf("Python version 3 is required\n"+err.Error()))
 	}
 	pinger, err := ping.NewPinger("moss.stanford.edu")
 	if err != nil {
-		log.Fatal(err)
+		errorS = append(errorS, fmt.Errorf("internal error: setting up ping: %w", err))
 	}
 	pinger.Count = 2
 	pinger.Timeout = time.Second * 2
@@ -177,13 +152,13 @@ func check() []error {
 		errorS = append(errorS, err)
 	}
 	if pinger.Statistics().PacketsRecv == 0 {
-		errorS = append(errorS, errors.New("couldn't conect to the server"))
+		errorS = append(errorS, fmt.Errorf("couldn't connect to the server"))
 	}
 	if viper.GetString("defaultOrg") == "" {
-		errorS = append(errorS, errors.New("please set an organization"))
+		errorS = append(errorS, fmt.Errorf("please set an organization"))
 	}
 	if viper.GetString("assignment") == "" {
-		errorS = append(errorS, errors.New("please set a current assignment"))
+		errorS = append(errorS, fmt.Errorf("please set a current assignment"))
 	}
 	return errorS
 }

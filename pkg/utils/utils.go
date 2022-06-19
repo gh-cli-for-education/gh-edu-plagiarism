@@ -2,7 +2,6 @@ package utils
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,9 +12,6 @@ import (
 )
 
 var (
-	// _, b, _, _ = runtime.Caller(0)
-	// Basepath   = filepath.Dir(b)
-
 	dir, _   = os.Executable()
 	Basepath = filepath.Dir(dir)
 )
@@ -41,6 +37,13 @@ query($endCursor: String) {
 `, org)
 }
 
+func Println(silent bool, a ...any) (int, error) {
+	if !silent {
+		return fmt.Println(a...)
+	}
+	return 0, nil
+}
+
 func ExecuteCmd(command string, showStderr bool, stdInFunc func(in io.Writer)) (string, error) {
 	shell := os.Getenv("SHELL")
 	if len(shell) == 0 {
@@ -54,7 +57,10 @@ func ExecuteCmd(command string, showStderr bool, stdInFunc func(in io.Writer)) (
 		cmd.Stderr = &bError
 	}
 	if stdInFunc != nil {
-		stdin, _ := cmd.StdinPipe()
+		stdin, err := cmd.StdinPipe()
+		if err != nil {
+			return "", fmt.Errorf("ExecuteCmd: stdin: %w", err)
+		}
 		go func() {
 			stdInFunc(stdin)
 			stdin.Close()
@@ -62,7 +68,7 @@ func ExecuteCmd(command string, showStderr bool, stdInFunc func(in io.Writer)) (
 	}
 	result, err := cmd.Output()
 	if err != nil {
-		return "", errors.New(bError.String() + err.Error()) // TODO simplify to fmt.Errorf?
+		return "", fmt.Errorf(bError.String() + err.Error())
 	}
 	return strings.TrimRight(string(result), "\n"), nil
 }
@@ -95,35 +101,7 @@ func OpenFile(file string) error {
 	case "darwin":
 		err = exec.Command("open", file).Run()
 	default:
-		fmt.Println("Open the file", file)
+		fmt.Println("Open the next file", file)
 	}
 	return err
-}
-
-var LangOptions = [...]string{"c", "cc", "java", "ml", "pascal", "ada", "lisp", "scheme", "haskell", "fortran", "ascii", "vhdl", "perl", "matlab", "python", "mips", "prolog", "spice", "vb", "csharp", "modula2", "a8086", "javascript", "plsql", "verilog"}
-
-type Language string
-
-func (l Language) String() string {
-	return string(l)
-}
-
-func (l *Language) Set(v string) error {
-	contain := func(options []string, value string) bool {
-		for _, o := range options {
-			if value == o {
-				return true
-			}
-		}
-		return false
-	}
-	if contain(LangOptions[:], v) {
-		*l = Language(v)
-		return nil
-	}
-	return fmt.Errorf("must be one of: %v", LangOptions)
-}
-
-func (e Language) Type() string {
-	return "https://github.com/gh-cli-for-education/gh-edu-plagiarism#compatible-languages"
 }
