@@ -13,8 +13,11 @@ import (
 )
 
 var (
-	_, b, _, _ = runtime.Caller(0)
-	Basepath   = filepath.Dir(b)
+	// _, b, _, _ = runtime.Caller(0)
+	// Basepath   = filepath.Dir(b)
+
+  dir, _ = os.Executable()
+  Basepath = filepath.Dir(dir)
 )
 
 func AllReposQ(org string) string {

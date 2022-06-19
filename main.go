@@ -153,7 +153,7 @@ func check() []error {
 		"fzf":    "You need to have fzf installed\nhttps://github.com/junegunn/fzf",
 		"mossum": "You need to have mossum installed\nhttps://github.com/hjalti/mossum",
 		"perl":   "You need to have perl installed",
-		mossPath: "You need to have a moss script in the root\nhttps://theory.stanford.edu/~aiken/moss/",
+    mossPath: "You need to have a moss script in the root\nhttps://theory.stanford.edu/~aiken/moss/\nRoot: " + utils.Basepath,
 	}
 	const posibleErr = 10
 	errorS := make([]error, 0, posibleErr)
