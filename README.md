@@ -8,6 +8,7 @@ Plagiarism is a plug-in for the gh-edu ecosystem to detect plagiarism in program
 ## Features
 - Highly concurrent: Concurrency and parallelism with no bottle necks so you can get results as fast as possible
 - Graceful degradation: If some process fails it tries to give you at least some results (moss URL, report file, graph image)
+- Works well in scale: It doesn't matter how many assignments or students are in your organization, plagiarism finds the balance between speed and memory consumption
 - Useful for scripting: It uses fzf to ask for user input but is totally functional trough CLI flags.
 
 ## How does it work?

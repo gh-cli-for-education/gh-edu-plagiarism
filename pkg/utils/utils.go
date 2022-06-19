@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,6 +21,9 @@ func AllReposQ(org string) string {
 	return fmt.Sprintf(`
 query($endCursor: String) {
   organization(login: "%s") {
+    membersWithRole {
+      totalCount
+    },
     repositories(first: 100, after: $endCursor) {
       pageInfo {
         endCursor
@@ -42,6 +46,11 @@ func Println(silent bool, a ...any) (int, error) {
 		return fmt.Println(a...)
 	}
 	return 0, nil
+}
+
+func Min(a, b int) int {
+	result := math.Min(float64(a), float64(b))
+	return int(result)
 }
 
 func ExecuteCmd(command string, showStderr bool, stdInFunc func(in io.Writer)) (string, error) {
