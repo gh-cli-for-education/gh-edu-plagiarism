@@ -20,7 +20,7 @@ import (
 type empty = struct{}
 
 func init() {
-	viper.SetConfigFile("../gh-edu/config.json")
+	viper.SetConfigFile("../gh-edu/config.json") // TODO is this os agnostic?
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatalf("Error with configuration file: " + err.Error())
 	}
@@ -41,6 +41,8 @@ var (
 	languageF    langType
 	anonymizeF   bool
 	quietF       bool
+	defaultOrgG  string
+	assignmentG  string
 )
 
 type repoObj struct {
@@ -94,9 +96,10 @@ func realMain() error {
 	return <-errC
 }
 
+// check everything is installed, the server is up and set up globals
 func check() []error {
 	utils.Println(quietF, "Checking everything is ok...")
-	mossPath := fmt.Sprintf("%s/moss", utils.Basepath)
+	mossPath := fmt.Sprintf("%s/moss", utils.Basepath) // TODO add perl script to repo and use environment var to get id
 	dependencies := map[string]string{
 		"fzf":    "You need to have fzf installed\nhttps://github.com/junegunn/fzf",
 		"mossum": "You need to have mossum installed\nhttps://github.com/hjalti/mossum",
@@ -127,10 +130,10 @@ func check() []error {
 	if pinger.Statistics().PacketsRecv == 0 {
 		errorS = append(errorS, fmt.Errorf("couldn't connect to the server"))
 	}
-	if viper.GetString("defaultOrg") == "" {
+	if defaultOrgG = viper.GetString("defaultOrg"); defaultOrgG == "" { // TODO add CLI options
 		errorS = append(errorS, fmt.Errorf("please set an organization"))
 	}
-	if viper.GetString("assignment") == "" {
+	if assignmentG = viper.GetString("assignment"); assignmentG == "" {
 		errorS = append(errorS, fmt.Errorf("please set a current assignment"))
 	}
 	return errorS
@@ -162,7 +165,7 @@ func cleanUp() error {
 // and all the repositories in the organization in JSON form
 func request() (int, []string, error) {
 	filter := []string{"--jq", ".data.organization.membersWithRole.totalCount, .data.organization.repositories.edges[].node"}
-	result := utils.ExecuteQuery(utils.AllReposQ(viper.GetString("defaultOrg")), filter...)
+	result := utils.ExecuteQuery(utils.AllReposQ(defaultOrgG), filter...)
 	membersNS, reposS, found := strings.Cut(result, "\n")
 	if !found {
 		return 0, nil, fmt.Errorf("request: the first value is not a number")

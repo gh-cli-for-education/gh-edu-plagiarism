@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -17,10 +18,20 @@ func send(clonedReposC <-chan repoObj, selectedTemplateC <-chan string, selected
 	if err != nil {
 		errC <- fmt.Errorf("internal error: send: regex to get URL from MOSS serve: %w", err)
 	}
+	regexDir, err := regexp.Compile(".*/")
+	if err != nil {
+		errC <- fmt.Errorf("internal error: send: regex to get tmp directory: %w", err)
+	}
 	var builder strings.Builder
 
-	clonedRepo := <-clonedReposC                                             // Get temp directory reading from the first cloned repo
-	tmpDir := string(regexp.MustCompile(".*/").Find([]byte(clonedRepo.dir))) // TODO should I panic?
+	clonedRepo, ok := <-clonedReposC // Get temp directory reading from the first cloned repo
+	if !ok {
+		errC <- fmt.Errorf("send: there are no repositories. Are you sure this regex assigment is correct?\n%s", assignmentG)
+	}
+	tmpDir := regexDir.Find([]byte(clonedRepo.dir))
+	if len(tmpDir) == 0 {
+		errC <- fmt.Errorf("internal error: send: cloned repo doesn't have an apropiate dir\nclonedRepo:%+v", clonedRepo)
+	}
 	builder.WriteString(fmt.Sprintf("%s/* ", clonedRepo.dir))
 	for clonedRepo := range clonedReposC {
 		builder.WriteString(fmt.Sprintf("%s/* ", clonedRepo.dir))
@@ -37,7 +48,7 @@ func send(clonedReposC <-chan repoObj, selectedTemplateC <-chan string, selected
 		log.Println(err)
 	}
 	mossUrl := regexUrl.Find([]byte(mossResult))
-	process(mossUrl, tmpDir, errC)
+	process(mossUrl, string(tmpDir), errC)
 	close(errC)
 }
 
@@ -59,14 +70,14 @@ func process(mossUrl []byte, tmpDir string, errC chan<- error) {
 	if err != nil {
 		fmt.Println("error: mossum: couldn't open report file\n", err)
 	} else {
-		// ReadAll will return a slice as big as the file generated but mossum.
-		// renember this is n!/((n-2)!2!) pairs. If the file is too big use io.Copy
-		report, err := io.ReadAll(f)
-		if err != nil {
+		defer f.Close()
+		// This generate a report with n!/((n-2)!2!) pairs
+		var bReport bytes.Buffer
+		if _, err = io.Copy(&bReport, f); err != nil {
 			fmt.Println("error: mossum: couldn't read report file\n", err)
 		} else {
 			utils.Println(quietF, "Report:")
-			fmt.Print(string(report)) // For some reason mossum report has 2 extra lines
+			fmt.Print(bReport.String()) // For some reason mossum report has 2 extra lines
 		}
 	}
 	if err = utils.OpenFile(tmpDir + "result-1.png"); err != nil {

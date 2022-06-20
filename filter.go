@@ -4,12 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
-
-	"github.com/spf13/viper"
 )
 
 func filter(allRepos []string, repos2CloneC chan<- repoObj, selectTemplateC chan<- string, errC chan<- error) {
-	regex, err := regexp.Compile(viper.GetString("assignment"))
+	regex, err := regexp.Compile(assignmentG)
 	if err != nil {
 		errC <- fmt.Errorf("filter: assignment regex: %w", err)
 	}
@@ -23,8 +21,7 @@ func filter(allRepos []string, repos2CloneC chan<- repoObj, selectTemplateC chan
 func filterReposNoTemplate(allRepos []string, regex *regexp.Regexp, repos2CloneC chan<- repoObj, errC chan<- error) {
 	for _, repo := range allRepos {
 		var obj repoObj
-		err := json.Unmarshal([]byte(repo), &obj)
-		if err != nil {
+		if err := json.Unmarshal([]byte(repo), &obj); err != nil {
 			errC <- fmt.Errorf("filter(no template): parse json: %w", err)
 		}
 		if regex.Match([]byte(obj.Name)) {
@@ -38,8 +35,7 @@ func filterReposWithTemplate(allRepos []string, regex *regexp.Regexp, repos2Clon
 	// var waitingRepos []repoObj
 	for _, repo := range allRepos {
 		var obj repoObj
-		err := json.Unmarshal([]byte(repo), &obj)
-		if err != nil {
+		if err := json.Unmarshal([]byte(repo), &obj); err != nil {
 			errC <- fmt.Errorf("filter(with template): parse json: %w", err)
 		}
 		if regex.Match([]byte(obj.Name)) {
