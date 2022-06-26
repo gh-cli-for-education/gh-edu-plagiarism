@@ -24,25 +24,42 @@ func init() {
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatalf("Error with configuration file: " + err.Error())
 	}
+	rootCmd.SilenceUsage = true
+	rootCmd.SilenceErrors = true
 	rootCmd.Flags().BoolVarP(&areTemplateF, "template", "t", false, "Indicate if there is a tutor template")
 	rootCmd.Flags().VarP(&languageF, "language", "l", "Select the language. You can treat this flag as a boolean or pass a string")
 	rootCmd.Flags().BoolVarP(&anonymizeF, "anonymize", "a", false, "Indicate if you want to randomize the names")
 	rootCmd.Flags().BoolVarP(&quietF, "quiet", "q", false, "No INFO in the output only the result")
+	rootCmd.Flags().StringVarP(&outputF, "output", "o", "", "Save the results in the specified path")
+	rootCmd.Flags().IntVarP(&percentageF, "percentage", "p", 90, "Minimum porcentage to show links")
+	rootCmd.Flags().IntVarP(&minLinesF, "min-lines", "m", 1, "Minimum lines to show links")
+	rootCmd.Flags().StringVarP(&exerciseF, "exercise", "e", "", "Specify the regex for the assignment/exercise")
+	viper.BindPFlag("assignment", rootCmd.Flags().Lookup("exercise"))
+	rootCmd.Flags().StringVarP(&courseF, "course", "c", "", "Specify the course/organization")
+	viper.BindPFlag("defaultOrg", rootCmd.Flags().Lookup("course"))
 }
 
 var (
 	rootCmd = &cobra.Command{
-		Use:   "gh edu plagiarism [-a] [-q] [-l [<language>]] [-t]",
-		Short: "Detect plagiarism in students assigment",
-		Long:  "gh-edu-plagiarism checks all the repositories from an assignment and compares it to detect plagiarism",
+		// Use:   "gh edu plagiarism [-a] [-q] [-l [<language>]] [-t]",
+		Use:   "gh edu plagiarism",
+		Short: "Detect plagiarism in students assignment",
+		Long:  "gh-edu-plagiarism checks all the repositories related to an assignment and compares them to detect plagiarism",
 		RunE:  func(cmd *cobra.Command, args []string) error { return realMain() },
 	}
 	areTemplateF bool
 	languageF    langType
+	outputF      string
+	percentageF  int
+	minLinesF    int
+	exerciseF    string
+	courseF      string
 	anonymizeF   bool
 	quietF       bool
-	defaultOrgG  string
-	assignmentG  string
+
+	defaultOrgG string
+	assignmentG string
+	fzfOpMsgG   string
 )
 
 type repoObj struct {
@@ -63,7 +80,7 @@ func realMain() error {
 		for _, err := range errS {
 			fmt.Println(err)
 		}
-		return fmt.Errorf("solve this/these problem(s) and try again")
+		return fmt.Errorf("Exiting with failure status due to previous errors")
 	}
 	err := cleanUp()
 	if err != nil {
@@ -86,7 +103,7 @@ func realMain() error {
 
 	go filter(allRepos, sendToCloneC, selectTemplateC, errC)
 	selectLangC := make(chan string, 1)
-	go func() { // fzf // TODO make fzf optional
+	go func() { // fzf (optional)
 		selectLanguage(selectLangC, errC)
 		selectTemplate(selectTemplateC, selectedTemplateC, errC)
 	}()
@@ -99,9 +116,12 @@ func realMain() error {
 // check everything is installed, the server is up and set up globals
 func check() []error {
 	utils.Println(quietF, "Checking everything is ok...")
+	if _, err := exec.LookPath("fzf"); err != nil {
+		fzfOpMsgG = "No fzf command found. Indicate the value in the CLI or install fzf:\nhttps://github.com/junegunn/fzf"
+	}
 	mossPath := fmt.Sprintf("%s/moss", utils.Basepath) // TODO add perl script to repo and use environment var to get id
 	dependencies := map[string]string{
-		"fzf":    "You need to have fzf installed\nhttps://github.com/junegunn/fzf",
+		// "fzf":    "You need to have fzf installed\nhttps://github.com/junegunn/fzf",
 		"mossum": "You need to have mossum installed\nhttps://github.com/hjalti/mossum",
 		"perl":   "You need to have perl installed",
 		mossPath: "You need to have a moss script in the root\nhttps://theory.stanford.edu/~aiken/moss/\nRoot: " + utils.Basepath,
@@ -130,11 +150,11 @@ func check() []error {
 	if pinger.Statistics().PacketsRecv == 0 {
 		errorS = append(errorS, fmt.Errorf("couldn't connect to the server"))
 	}
-	if defaultOrgG = viper.GetString("defaultOrg"); defaultOrgG == "" { // TODO add CLI options
+	if defaultOrgG = viper.GetString("defaultOrg"); defaultOrgG == "" {
 		errorS = append(errorS, fmt.Errorf("please set an organization"))
 	}
 	if assignmentG = viper.GetString("assignment"); assignmentG == "" {
-		errorS = append(errorS, fmt.Errorf("please set a current assignment"))
+		errorS = append(errorS, fmt.Errorf("please set a current exercise/assignment"))
 	}
 	return errorS
 }
@@ -150,7 +170,7 @@ func cleanUp() error {
 	pattern := tempDir + `/*gh-edu-plagiarism`
 	filesString, err := filepath.Glob(pattern)
 	if err != nil {
-		return fmt.Errorf("internal error: cleanUp: %w", err)
+		return fmt.Errorf("internal error: cleanUp: %w", err) // error access temporal directory
 	}
 	for _, fString := range filesString {
 		err = os.RemoveAll(fString)
@@ -165,17 +185,13 @@ func cleanUp() error {
 // and all the repositories in the organization in JSON form
 func request() (int, []string, error) {
 	filter := []string{"--jq", ".data.organization.membersWithRole.totalCount, .data.organization.repositories.edges[].node"}
-	result := utils.ExecuteQuery(utils.AllReposQ(defaultOrgG), filter...)
-	membersNS, reposS, found := strings.Cut(result, "\n")
-	if !found {
-		return 0, nil, fmt.Errorf("request: the first value is not a number")
-	}
-	membersN, err := strconv.Atoi(membersNS)
+	response := utils.ExecuteQuery(utils.AllReposQ(defaultOrgG), filter...)
+	responseSlice := strings.Split(response, "\n")
+	membersN, err := strconv.Atoi(responseSlice[0])
 	if err != nil {
 		return 0, nil, fmt.Errorf("request: convert number to string: %w", err)
 	}
-	allRepos := strings.Split(reposS, "\n")
-	return utils.Min(50, membersN), allRepos[:len(allRepos)-1], nil
+	return utils.Min(50, membersN), responseSlice[1 : len(responseSlice)-1], nil
 }
 
 var langOptions = [...]string{"c", "cc", "java", "ml", "pascal", "ada", "lisp", "scheme", "haskell", "fortran", "ascii", "vhdl", "perl", "matlab", "python", "mips", "prolog", "spice", "vb", "csharp", "modula2", "a8086", "javascript", "plsql", "verilog"}
@@ -211,12 +227,16 @@ func selectLanguage(selectedLangC chan<- string, errC chan<- error) {
 		selectedLangC <- string(languageF)
 		return
 	}
+	if fzfOpMsgG != "" {
+		errC <- fmt.Errorf(fzfOpMsgG)
+		return
+	}
 	stdInFunc := func(in io.Writer) {
 		for _, l := range langOptions {
 			io.WriteString(in, l+"\n")
 		}
 	}
-	languageS, err := utils.ExecuteCmd("fzf", true, stdInFunc)
+	languageS, err := utils.ExecuteCmd(utils.FzfCmd("Choose the programing language"), true, stdInFunc)
 	if err != nil {
 		errC <- fmt.Errorf("selectLanguage: %w", err)
 		return
@@ -229,12 +249,16 @@ func selectTemplate(reposC <-chan string, selectedTemplateC chan<- string, errC 
 	if reposC == nil || selectedTemplateC == nil {
 		return
 	}
+	if fzfOpMsgG != "" {
+		errC <- fmt.Errorf(fzfOpMsgG)
+		return
+	}
 	stdInFunc := func(in io.Writer) {
 		for repo := range reposC {
 			io.WriteString(in, repo+"\n")
 		}
 	}
-	result, err := utils.ExecuteCmd("fzf", true, stdInFunc)
+	result, err := utils.ExecuteCmd(utils.FzfCmd("Select which repository is the template") , true, stdInFunc)
 	if err != nil {
 		errC <- fmt.Errorf("selectTemplate: %w", err)
 		return

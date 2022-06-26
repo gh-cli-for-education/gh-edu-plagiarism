@@ -9,7 +9,7 @@ import (
 func filter(allRepos []string, repos2CloneC chan<- repoObj, selectTemplateC chan<- string, errC chan<- error) {
 	regex, err := regexp.Compile(assignmentG)
 	if err != nil {
-		errC <- fmt.Errorf("filter: assignment regex: %w", err)
+		errC <- fmt.Errorf("filter: assignment regex is not valid: %w", err)
 	}
 	if selectTemplateC == nil {
 		filterReposNoTemplate(allRepos, regex, repos2CloneC, errC)
@@ -32,7 +32,6 @@ func filterReposNoTemplate(allRepos []string, regex *regexp.Regexp, repos2CloneC
 }
 
 func filterReposWithTemplate(allRepos []string, regex *regexp.Regexp, repos2CloneC chan<- repoObj, selectTemplateC chan<- string, errC chan<- error) {
-	// var waitingRepos []repoObj
 	for _, repo := range allRepos {
 		var obj repoObj
 		if err := json.Unmarshal([]byte(repo), &obj); err != nil {
@@ -41,16 +40,8 @@ func filterReposWithTemplate(allRepos []string, regex *regexp.Regexp, repos2Clon
 		if regex.Match([]byte(obj.Name)) {
 			selectTemplateC <- obj.Name
 			repos2CloneC <- obj
-			// select { // Order is not important so queue the filtered repos if clone module is at full capacity
-			// case repos2CloneC <- obj:
-			// default:
-			// waitingRepos = append(waitingRepos, obj)
-			// }
 		}
 	}
 	close(selectTemplateC)
-	// for _, repo := range waitingRepos {
-	// repos2CloneC <- repo
-	// }
 	close(repos2CloneC)
 }

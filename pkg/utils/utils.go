@@ -82,6 +82,14 @@ func ExecuteCmd(command string, showStderr bool, stdInFunc func(in io.Writer)) (
 	return strings.TrimRight(string(result), "\n"), nil
 }
 
+// FzfCmd returns a customized fzf command
+func FzfCmd(prompt string) string {
+	if prompt != "" {
+		return fmt.Sprintf("fzf --prompt='%s>' --layout=reverse --border", prompt)
+	}
+	return "fzf --layout=reverse --border"
+}
+
 func ExecuteQuery(query string, options ...string) string {
 	commandString := []string{"api", "graphql", "--paginate"}
 	if len(options) > 0 {

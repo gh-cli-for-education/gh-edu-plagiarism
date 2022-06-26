@@ -22,11 +22,12 @@ func send(clonedReposC <-chan repoObj, selectedTemplateC <-chan string, selected
 	if err != nil {
 		errC <- fmt.Errorf("internal error: send: regex to get tmp directory: %w", err)
 	}
-	var builder strings.Builder
+	var builder strings.Builder //
 
 	clonedRepo, ok := <-clonedReposC // Get temp directory reading from the first cloned repo
 	if !ok {
-		errC <- fmt.Errorf("send: there are no repositories. Are you sure this regex assigment is correct?\n%s", assignmentG)
+		errC <- fmt.Errorf("send: there are no repositories in %s organization. Are you sure this regex assigment is correct?\n%s",
+			defaultOrgG, assignmentG)
 	}
 	tmpDir := regexDir.Find([]byte(clonedRepo.dir))
 	if len(tmpDir) == 0 {
@@ -41,7 +42,7 @@ func send(clonedReposC <-chan repoObj, selectedTemplateC <-chan string, selected
 		template = fmt.Sprintf("-b %s%s/* ", tmpDir, <-selectedTemplateC)
 	}
 	// Send request to Moss service
-	mossCmd := fmt.Sprintf("%s/moss -l %s -d %s %s", utils.Basepath, <-selectedLangC, template, builder.String()) // TODO let the user decide lines or % TODO --output flag
+	mossCmd := fmt.Sprintf("%s/moss -l %s -d %s %s", utils.Basepath, <-selectedLangC, template, builder.String())
 	utils.Println(quietF, "Connecting with Moss server...")
 	mossResult, err := utils.ExecuteCmd(mossCmd, false, nil)
 	if err != nil {
@@ -52,13 +53,24 @@ func send(clonedReposC <-chan repoObj, selectedTemplateC <-chan string, selected
 	close(errC)
 }
 
-// Process the result with mossum. TODO check more options in mossum
-func process(mossUrl []byte, tmpDir string, errC chan<- error) {
-	aF := ""
+// internal couroutine to get flags values
+func prepareFlags(tmpDir string) (aF string, oF string) {
 	if anonymizeF {
 		aF = "-a"
 	}
-	mossumCmd := fmt.Sprintf("mossum -p 5 -r -t \".*/(.+)/.*\" %s -o %s/result %s", aF, tmpDir, mossUrl) // .*/(.+).* from <randNumber>gh-edu-plagiarism/assigmentName/ get assigmentName
+	if outputF == "" {
+		oF = tmpDir + "/result"
+	} else {
+		oF = outputF
+	}
+	return
+}
+
+// Process the result with mossum.
+func process(mossUrl []byte, tmpDir string, errC chan<- error) {
+	aF, oF := prepareFlags(tmpDir)
+	// .*/(.+).* from <randNumber>gh-edu-plagiarism/assigmentName/ get assigmentName
+	mossumCmd := fmt.Sprintf("mossum -p %v -l %v -r -t \".*/(.+)/.*\" %s -o %s %s", percentageF, minLinesF, aF, oF, mossUrl)
 	utils.Println(quietF, "Generating graph...")
 	_, err := utils.ExecuteCmd(mossumCmd, false, nil)
 	if err != nil {
