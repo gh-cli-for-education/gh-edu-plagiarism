@@ -20,7 +20,7 @@ import (
 type empty = struct{}
 
 func init() {
-	viper.SetConfigFile("../gh-edu/config.json") // TODO is this os agnostic?
+	viper.SetConfigFile(filepath.Join("..", "gh-edu", "data", "data.json"))
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatalf("Error with configuration file: " + err.Error())
 	}
