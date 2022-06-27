@@ -20,9 +20,9 @@ import (
 type empty = struct{}
 
 func init() {
-	viper.SetConfigFile(filepath.Join("..", "gh-edu", "data", "data.json"))
+	viper.SetConfigFile(filepath.Join(utils.Basepath, "..", "gh-edu", "data", "data.json"))
 	if err := viper.ReadInConfig(); err != nil {
-    log.Panicf("Error with configuration file: %s\nRoot: %s", err.Error(), utils.Basepath)
+		log.Fatalf("Error with configuration file: %s\nRoot: %s", err.Error(), utils.Basepath)
 	}
 	rootCmd.SilenceUsage = true
 	rootCmd.SilenceErrors = true
