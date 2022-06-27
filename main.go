@@ -31,7 +31,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&anonymizeF, "anonymize", "a", false, "Indicate if you want to randomize the names")
 	rootCmd.Flags().BoolVarP(&quietF, "quiet", "q", false, "No INFO in the output only the result")
 	rootCmd.Flags().StringVarP(&outputF, "output", "o", "", "Save the results in the specified path")
-	rootCmd.Flags().IntVarP(&percentageF, "percentage", "p", 90, "Minimum porcentage to show links")
+	rootCmd.Flags().IntVarP(&percentageF, "percentage", "p", 1, "Minimum porcentage to show links")
 	rootCmd.Flags().IntVarP(&minLinesF, "min-lines", "m", 1, "Minimum lines to show links")
 	rootCmd.Flags().StringVarP(&exerciseF, "exercise", "e", "", "Specify the regex for the assignment/exercise")
 	viper.BindPFlag("assignment", rootCmd.Flags().Lookup("exercise"))

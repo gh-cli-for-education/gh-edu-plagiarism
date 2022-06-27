@@ -22,7 +22,7 @@ func send(clonedReposC <-chan repoObj, selectedTemplateC <-chan string, selected
 	if err != nil {
 		errC <- fmt.Errorf("internal error: send: regex to get tmp directory: %w", err)
 	}
-	var builder strings.Builder //
+	var builder strings.Builder // Set up end
 
 	clonedRepo, ok := <-clonedReposC // Get temp directory reading from the first cloned repo
 	if !ok {
