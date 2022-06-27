@@ -72,12 +72,17 @@ https://www.quora.com/Why-is-the-MOSS-measure-of-the-software-similarity-algorit
 Extracted from the ``--help`` flag
 ```
 Usage:
-  gh edu plagiarism [-a] [-q] [-l [<language>]] [-t] [flags]
+  gh edu plagiarism [flags]
 
 Flags:
   -a, --anonymize                                                                                 Indicate if you want to randomize the names
+  -c, --course string                                                                             Specify the course/organization
+  -e, --exercise string                                                                           Specify the regex for the assignment/exercise
   -h, --help                                                                                      help for gh
-  -l, --language https://github.com/gh-cli-for-education/gh-edu-plagiarism#compatible-languages   Select the language
+  -l, --language https://github.com/gh-cli-for-education/gh-edu-plagiarism#compatible-languages   Select the language. You can treat this flag as a boolean or pass a string
+  -m, --min-lines int                                                                             Minimum lines to show links (default 1)
+  -o, --output string                                                                             Save the results in the specified path
+  -p, --percentage int                                                                            Minimum porcentage to show links (default 1)
   -q, --quiet                                                                                     No INFO in the output only the result
   -t, --template                                                                                  Indicate if there is a tutor template
 ```
