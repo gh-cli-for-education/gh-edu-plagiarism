@@ -77,8 +77,8 @@ func main() {
 func realMain() error {
 	errS := check()
 	if len(errS) > 0 {
-		for _, err := range errS {
-			fmt.Println(err)
+		for i, err := range errS {
+			fmt.Println(i, ". ", err)
 		}
 		return fmt.Errorf("Exiting with failure status due to previous errors")
 	}
@@ -153,7 +153,7 @@ func check() []error {
 	if defaultOrgG = viper.GetString("defaultOrg"); defaultOrgG == "" {
 		errorS = append(errorS, fmt.Errorf("please set an organization"))
 	}
-	if assignmentG = viper.GetString("assignment"); assignmentG == "" {
+	if assignmentG = viper.GetString("assignmentR"); assignmentG == "" {
 		errorS = append(errorS, fmt.Errorf("please set a current exercise/assignment"))
 	}
 	return errorS
