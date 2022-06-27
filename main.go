@@ -22,7 +22,7 @@ type empty = struct{}
 func init() {
 	viper.SetConfigFile(filepath.Join("..", "gh-edu", "data", "data.json"))
 	if err := viper.ReadInConfig(); err != nil {
-		log.Fatalf("Error with configuration file: " + err.Error())
+    log.Panicf("Error with configuration file: %s\nRoot: %s", err.Error(), utils.Basepath)
 	}
 	rootCmd.SilenceUsage = true
 	rootCmd.SilenceErrors = true
@@ -78,7 +78,7 @@ func realMain() error {
 	errS := check()
 	if len(errS) > 0 {
 		for i, err := range errS {
-			fmt.Println(i, ". ", err)
+			fmt.Println(i+1, ". ", err)
 		}
 		return fmt.Errorf("Exiting with failure status due to previous errors")
 	}
@@ -258,7 +258,7 @@ func selectTemplate(reposC <-chan string, selectedTemplateC chan<- string, errC 
 			io.WriteString(in, repo+"\n")
 		}
 	}
-	result, err := utils.ExecuteCmd(utils.FzfCmd("Select which repository is the template") , true, stdInFunc)
+	result, err := utils.ExecuteCmd(utils.FzfCmd("Select which repository is the template"), true, stdInFunc)
 	if err != nil {
 		errC <- fmt.Errorf("selectTemplate: %w", err)
 		return
