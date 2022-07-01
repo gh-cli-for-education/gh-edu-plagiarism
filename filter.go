@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"regexp"
 )
 
@@ -22,7 +23,7 @@ func filterReposNoTemplate(allRepos []string, regex *regexp.Regexp, repos2CloneC
 	for _, repo := range allRepos {
 		var obj repoObj
 		if err := json.Unmarshal([]byte(repo), &obj); err != nil {
-			errC <- fmt.Errorf("filter(no template): parse json: %w", err)
+			log.Panicf("filter(no template): parse json: %s \nwith repo: %s", err, repo)
 		}
 		if regex.Match([]byte(obj.Name)) {
 			repos2CloneC <- obj
@@ -35,7 +36,7 @@ func filterReposWithTemplate(allRepos []string, regex *regexp.Regexp, repos2Clon
 	for _, repo := range allRepos {
 		var obj repoObj
 		if err := json.Unmarshal([]byte(repo), &obj); err != nil {
-			errC <- fmt.Errorf("filter(with template): parse json: %w", err)
+			log.Panicf("filter(no template): parse json: %s \nwith repo: %s", err, repo)
 		}
 		if regex.Match([]byte(obj.Name)) {
 			selectTemplateC <- obj.Name
