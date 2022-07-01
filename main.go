@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
+	// "time"
 
 	"github.com/gh-cli-for-education/gh-edu-plagiarism/pkg/utils"
-	"github.com/go-ping/ping"
+	// "github.com/go-ping/ping"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -78,7 +78,7 @@ func realMain() error {
 	errS := check()
 	if len(errS) > 0 {
 		for i, err := range errS {
-			fmt.Println(i+1, ". ", err)
+			fmt.Println(i+1, ".", err)
 		}
 		return fmt.Errorf("Exiting with failure status due to previous errors")
 	}
@@ -119,7 +119,7 @@ func check() []error {
 	if _, err := exec.LookPath("fzf"); err != nil {
 		fzfOpMsgG = "No fzf command found. Indicate the value in the CLI or install fzf:\nhttps://github.com/junegunn/fzf"
 	}
-	mossPath := fmt.Sprintf("%s/moss", utils.Basepath) // TODO add perl script to repo and use environment var to get id
+	mossPath := fmt.Sprintf("%s/moss", utils.Basepath)
 	dependencies := map[string]string{
 		// "fzf":    "You need to have fzf installed\nhttps://github.com/junegunn/fzf",
 		"mossum": "You need to have mossum installed\nhttps://github.com/hjalti/mossum",
@@ -137,19 +137,19 @@ func check() []error {
 	if r, err := utils.ExecuteCmd(`python -c "print(__import__('sys').version_info[:1]==(3,))"`, false, nil); r != "True" {
 		errorS = append(errorS, fmt.Errorf("Python version 3 is required\n"+err.Error()))
 	}
-	pinger, err := ping.NewPinger("moss.stanford.edu")
-	if err != nil {
-		errorS = append(errorS, fmt.Errorf("internal error: setting up ping: %w", err))
-	}
-	pinger.Count = 2
-	pinger.Timeout = time.Second * 2
-	err = pinger.Run() // Blocks until finished.
-	if err != nil {
-		errorS = append(errorS, err)
-	}
-	if pinger.Statistics().PacketsRecv == 0 {
-		errorS = append(errorS, fmt.Errorf("couldn't connect to the server"))
-	}
+	// pinger, err := ping.NewPinger("moss.stanford.edu")
+	// if err != nil {
+	// 	errorS = append(errorS, fmt.Errorf("internal error: setting up ping: %w", err))
+	// }
+	// pinger.Count = 2
+	// pinger.Timeout = time.Second * 2
+	// err = pinger.Run() // Blocks until finished.
+	// if err != nil {
+	// 	errorS = append(errorS, err)
+	// }
+	// if pinger.Statistics().PacketsRecv == 0 {
+	// 	errorS = append(errorS, fmt.Errorf("couldn't connect to the server"))
+	// }
 	if defaultOrgG = viper.GetString("defaultOrg"); defaultOrgG == "" {
 		errorS = append(errorS, fmt.Errorf("please set an organization"))
 	}
