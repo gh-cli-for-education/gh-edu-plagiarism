@@ -7,12 +7,17 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"runtime"
 	"strings"
 )
 
 var (
+	usr, _ = user.Current()
+	home   = usr.HomeDir
+  ConfigPath = filepath.Join(home, ".config", "gh-edu", "data.json")
+
 	dir, _   = os.Executable()
 	Basepath = filepath.Dir(dir)
 )

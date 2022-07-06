@@ -20,9 +20,9 @@ import (
 type empty = struct{}
 
 func init() {
-	viper.SetConfigFile(filepath.Join(utils.Basepath, "..", "gh-edu", "data", "data.json"))
+	viper.SetConfigFile(utils.ConfigPath)
 	if err := viper.ReadInConfig(); err != nil {
-		log.Fatalf("Error with configuration file: %s\nRoot: %s", err.Error(), utils.Basepath)
+    log.Fatalf("Error with configuration file:\n %s \n%s\n", utils.ConfigPath, err.Error())
 	}
 	rootCmd.SilenceUsage = true
 	rootCmd.SilenceErrors = true
@@ -34,7 +34,7 @@ func init() {
 	rootCmd.Flags().IntVarP(&percentageF, "percentage", "p", 1, "Minimum porcentage to show links")
 	rootCmd.Flags().IntVarP(&minLinesF, "min-lines", "m", 1, "Minimum lines to show links")
 	rootCmd.Flags().StringVarP(&exerciseF, "exercise", "e", "", "Specify the regex for the assignment/exercise")
-	viper.BindPFlag("assignment", rootCmd.Flags().Lookup("exercise"))
+	viper.BindPFlag("assignmentR", rootCmd.Flags().Lookup("exercise"))
 	rootCmd.Flags().StringVarP(&courseF, "course", "c", "", "Specify the course/organization")
 	viper.BindPFlag("defaultOrg", rootCmd.Flags().Lookup("course"))
 }
